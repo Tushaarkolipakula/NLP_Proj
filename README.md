@@ -1,1 +1,1 @@
-# NLP_Proj
+# Indic Translator
