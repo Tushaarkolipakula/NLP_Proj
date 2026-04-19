@@ -147,7 +147,3 @@ nmt_checkpoint.pth
 * Subword tokenization (BPE)
 
 ---
-
-## License
-
-This project is intended for educational and research purposes.
