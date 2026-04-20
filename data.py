@@ -28,6 +28,22 @@ class Lang:
             self.n_words += 1
         else:
             self.word2count[word] += 1
+            
+    def trim(self, min_count):
+        """Removes rare words failing the minimum frequency threshold"""
+        keep_words = []
+        for word, count in self.word2count.items():
+            if count >= min_count:
+                keep_words.append(word)
+
+        # Re-initialize mappings
+        self.word2index = {"<PAD>": PAD_TOKEN, "<SOS>": SOS_TOKEN, "<EOS>": EOS_TOKEN, "<UNK>": UNK_TOKEN}
+        self.word2count = {}
+        self.index2word = {PAD_TOKEN: "<PAD>", SOS_TOKEN: "<SOS>", EOS_TOKEN: "<EOS>", UNK_TOKEN: "<UNK>"}
+        self.n_words = 4
+
+        for word in keep_words:
+            self.add_word(word)
 
 
 def normalize_string(s):
@@ -74,7 +90,7 @@ class TranslationDataset(Dataset):
         src_sentence, trg_sentence = self.pairs[idx]
         
         src_indexes = indexes_from_sentence(self.input_lang, src_sentence)
-        trg_indexes = indexes_from_sentence(self.output_lang, trg_sentence)
+        trg_indexes = [SOS_TOKEN] + indexes_from_sentence(self.output_lang, trg_sentence)
         
         src_indexes.append(EOS_TOKEN)
         trg_indexes.append(EOS_TOKEN)
@@ -108,6 +124,6 @@ def collate_fn_pad(batch):
     
     return src_padded, trg_padded
 
-def get_dataloader(pairs, input_lang, output_lang, batch_size=32, max_len=50):
+def get_dataloader(pairs, input_lang, output_lang, batch_size=32, max_len=50, num_workers=4):
     dataset = TranslationDataset(pairs, input_lang, output_lang, max_len)
-    return DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=collate_fn_pad)
+    return DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=collate_fn_pad, num_workers=num_workers, pin_memory=True)

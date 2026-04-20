@@ -39,16 +39,22 @@ def train_epoch(model, dataloader, optimizer, criterion, clip=1.0):
         if i % 100 == 0:
             print(f"Batch {i}/{len(dataloader)} Loss: {loss.item():.4f}")
             
+        # Intermediate saves to prevent progress loss
+        if i % 2500 == 0 and i > 0:
+            print(f"Intermediate Checkpoint saved at batch {i}!")
+            torch.save(model.state_dict(), "nmt_checkpoint.pth")
+            
     return epoch_loss / len(dataloader)
 
 
-def train_model(model, dataloader, optimizer, num_epochs=10, save_path="nmt_checkpoint.pth"):
+def train_model(model, dataloader, optimizer, num_epochs=5, save_path="nmt_checkpoint.pth", patience=2):
     """
-    Main training harness.
+    Main training harness with early stopping.
     """
     criterion = nn.CrossEntropyLoss(ignore_index=PAD_TOKEN)
     
     best_loss = float('inf')
+    patience_counter = 0
     
     # Timing utilities
     def as_minutes(s):
@@ -64,11 +70,18 @@ def train_model(model, dataloader, optimizer, num_epochs=10, save_path="nmt_chec
         print(f"Epoch: {epoch+1:02} | Time Elapsed: {as_minutes(time.time() - start_time)}")
         print(f"\tTrain Loss: {train_loss:.3f} | Train PPL: {math.exp(train_loss):7.3f}")
         
-        # Basic save condition
+        # Early stopping & save condition
         if train_loss < best_loss:
             best_loss = train_loss
+            patience_counter = 0
             print(f"Saving checkpoint to {save_path}...")
             torch.save(model.state_dict(), save_path)
+        else:
+            patience_counter += 1
+            print(f"No improvement in loss for {patience_counter} epoch(s).")
+            if patience_counter >= patience:
+                print("Early stopping triggered!")
+                break
             
     print("Training finished!")
 
@@ -98,18 +111,30 @@ if __name__ == "__main__":
         input_lang.add_sentence(pair[0])
         output_lang.add_sentence(pair[1])
         
-    print(f"Input Vocab: {input_lang.n_words} words")
-    print(f"Output Vocab: {output_lang.n_words} words")
+    print(f"Original Input Vocab: {input_lang.n_words} words")
+    print(f"Original Output Vocab: {output_lang.n_words} words")
+    
+    # Trim rare words occurring fewer than 2 times to prevent Softmax layer blowup
+    input_lang.trim(2)
+    output_lang.trim(2)
+        
+    print(f"Trimmed Input Vocab: {input_lang.n_words} words")
+    print(f"Trimmed Output Vocab: {output_lang.n_words} words")
     print(f"Total pairs: {len(pairs)}")
+    
+    import pickle
+    with open("vocab.pkl", "wb") as f:
+        pickle.dump((input_lang, output_lang), f)
+    print("Saved vocab.pkl")
     
     device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
     print(f"Using device: {device}")
     
     HIDDEN_SIZE = 256
     EMBEDDING_DIM = 256
-    BATCH_SIZE = 32
+    BATCH_SIZE = 128
     MAX_LEN = 50
-    NUM_EPOCHS = 10
+    NUM_EPOCHS = 5
     
     print("Creating dataloader...")
     dataloader = get_dataloader(pairs, input_lang, output_lang, batch_size=BATCH_SIZE, max_len=MAX_LEN)

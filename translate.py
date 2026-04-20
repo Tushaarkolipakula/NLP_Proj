@@ -8,7 +8,7 @@ class Translator:
     """
     Wrapper class to load the model checkpoint and expose a simple translation API.
     """
-    def __init__(self, checkpoint_path, input_lang, output_lang, hidden_size=512, embedding_dim=256):
+    def __init__(self, checkpoint_path, input_lang, output_lang, hidden_size=256, embedding_dim=256):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.input_lang = input_lang
         self.output_lang = output_lang
@@ -41,18 +41,19 @@ class Translator:
             return f"[Error] Translation failed: {e}"
 
 if __name__ == "__main__":
+    import pickle
     parser = argparse.ArgumentParser(description="Indic NMT Translator CLI")
     parser.add_argument("--checkpoint", type=str, default="nmt_checkpoint.pth", help="Path to the model checkpoint.")
+    parser.add_argument("--vocab", type=str, default="vocab.pkl", help="Path to the vocabulary pickle file.")
     
     args = parser.parse_args()
     
-    # Normally, you would save and load the `Lang` dictionaries from a pickle file.
-    # Because we don't have the IIT Bombay Corpus yet, we demonstrate dummy instantation.
-    print("Initialize translator with empty vocabulary since we await the corpus...")
-    dummy_eng = Lang("english")
-    dummy_hin = Lang("hindi")
-    
-    translator = Translator(args.checkpoint, dummy_eng, dummy_hin)
+    print(f"Loading vocabulary from {args.vocab}...")
+    with open(args.vocab, 'rb') as f:
+        input_lang, output_lang = pickle.load(f)
+        
+    print("Initialize translator...")
+    translator = Translator(args.checkpoint, input_lang, output_lang)
     
     print("\nNMT Interactive Interface. Type 'q' to quit.")
     while True:
